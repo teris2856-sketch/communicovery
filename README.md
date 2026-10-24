@@ -1,5 +1,7 @@
 # Communicovery
 
+`lib/` is the main app code.
+
 A Flutter app for patients and caregivers: Communication (AAC), Community, Mood Check, Body Check, and AI Chatbot.
 
 ## Where is the app code?

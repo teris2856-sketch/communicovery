@@ -1,16 +1,19 @@
-# swiftspeak
+# Communicovery
 
-A new Flutter project.
+A Flutter app for patients and caregivers: Communication (AAC), Community, Mood Check, Body Check, and AI Chatbot.
 
-## Getting Started
+## Where is the app code?
 
-This project is a starting point for a Flutter application.
+**`lib/` is the main app code.** Flutter requires that folder name, so it cannot be renamed.
 
-A few resources to get you started if this is your first Flutter project:
+Open `lib/` to see the screens and features:
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- `home_page.dart` — patient home
+- `communicate.dart` — AAC communication board
+- `community_page.dart` — community
+- `mood_check.dart` — mood check
+- `body_check.dart` — body check
+- `AI_Chatbot.dart` — AI chatbot
+- `l10n/` — translations
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+Other folders (`android`, `ios`, `assets`, and so on) are platform and project files, not the main Dart code.

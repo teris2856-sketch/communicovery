@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'mood_details1.dart';
 import 'home_page.dart';
 
@@ -31,20 +32,22 @@ class _MoodCheck4State extends State<MoodCheck4> {
 
   @override
   Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
+    return AppLangBuilder(
+      builder: (context, t) {
+        final user = FirebaseAuth.instance.currentUser;
 
-    if (user == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text("Mood Check History"),
-          backgroundColor: Colors.blueAccent,
-          centerTitle: true,
-        ),
-        body: const Center(
-          child: Text("Please log in first.", style: TextStyle(fontSize: 22)),
-        ),
-      );
-    }
+        if (user == null) {
+          return Scaffold(
+            appBar: AppBar(
+              title: Text(t('moodHistoryTitle')),
+              backgroundColor: Colors.blueAccent,
+              centerTitle: true,
+            ),
+            body: Center(
+              child: Text(t('pleaseLogIn'), style: const TextStyle(fontSize: 22)),
+            ),
+          );
+        }
 
     final query = FirebaseFirestore.instance
         .collection('users')
@@ -52,9 +55,9 @@ class _MoodCheck4State extends State<MoodCheck4> {
         .collection('mood_checks')
         .orderBy('createdAt', descending: true);
 
-    return Scaffold(
+        return Scaffold(
       appBar: AppBar(
-        title: const Text("Mood Check History"),
+        title: Text(t('moodHistoryTitle')),
         backgroundColor: Colors.blueAccent,
         centerTitle: true,
       ),
@@ -68,28 +71,46 @@ class _MoodCheck4State extends State<MoodCheck4> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      key: ValueKey('mood-month-${AppLanguage.instance.code}-$selectedMonth'),
                       initialValue: selectedMonth,
                       decoration: InputDecoration(
-                        labelText: "Month",
+                        labelText: t('month'),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.blueAccent.withValues(alpha: 0.08),
                       ),
-                      items: months.map((m) => DropdownMenuItem(value: m, child: Text(m))).toList(),
+                      selectedItemBuilder: (context) => months
+                          .map((m) => Text(AppLanguage.instance.monthLabel(m)))
+                          .toList(),
+                      items: months
+                          .map((m) => DropdownMenuItem(
+                                value: m,
+                                child: Text(AppLanguage.instance.monthLabel(m)),
+                              ))
+                          .toList(),
                       onChanged: (value) => setState(() => selectedMonth = value!),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      key: ValueKey('mood-year-${AppLanguage.instance.code}-$selectedYear'),
                       initialValue: selectedYear,
                       decoration: InputDecoration(
-                        labelText: "Year",
+                        labelText: t('year'),
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         filled: true,
                         fillColor: Colors.blueAccent.withValues(alpha: 0.08),
                       ),
-                      items: years.map((y) => DropdownMenuItem(value: y, child: Text(y))).toList(),
+                      selectedItemBuilder: (context) => years
+                          .map((y) => Text(AppLanguage.instance.yearLabel(y)))
+                          .toList(),
+                      items: years
+                          .map((y) => DropdownMenuItem(
+                                value: y,
+                                child: Text(AppLanguage.instance.yearLabel(y)),
+                              ))
+                          .toList(),
                       onChanged: (value) => setState(() => selectedYear = value!),
                     ),
                   ),
@@ -122,7 +143,7 @@ class _MoodCheck4State extends State<MoodCheck4> {
 
                     if (filtered.isEmpty) {
                       return Center(
-                        child: Text("No results found", style: TextStyle(fontSize: 24, color: Colors.grey[700])),
+                        child: Text(t('noResultsFound'), style: TextStyle(fontSize: 24, color: Colors.grey[700])),
                       );
                     }
 
@@ -136,7 +157,7 @@ class _MoodCheck4State extends State<MoodCheck4> {
                         if (ts is Timestamp) dt = ts.toDate();
 
                         final titleDate = dt == null
-                            ? "Just now"
+                            ? t('justNow')
                             : "${dt.month}/${dt.day}/${dt.year}";
 
                         return Padding(
@@ -188,7 +209,7 @@ class _MoodCheck4State extends State<MoodCheck4> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   icon: const Icon(Icons.home),
-                  label: const Text("Back to Home", style: TextStyle(fontSize: 24)),
+                  label: Text(t('backToHome'), style: const TextStyle(fontSize: 24)),
                   style: ElevatedButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     backgroundColor: Colors.blueAccent,
@@ -204,6 +225,8 @@ class _MoodCheck4State extends State<MoodCheck4> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

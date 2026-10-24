@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:swiftspeak/app_language.dart';
 
 class MoodCheckService {
   MoodCheckService({
@@ -47,7 +48,8 @@ class MoodCheckService {
         "- Confidence: ${confidence.toStringAsFixed(1)}/5\n\n"
         "Write 3–5 encouraging sentences.\n"
         "Be supportive, calm, and practical.\n"
-        "Do NOT provide medical diagnosis.\n";
+        "Do NOT provide medical diagnosis.\n"
+        "${AppLanguage.instance.replyLanguageRule}\n";
 
     // Responses API request body
     final body = <String, dynamic>{

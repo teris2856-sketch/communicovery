@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/login.dart';
 
 Future<void> main() async {
@@ -10,6 +13,7 @@ Future<void> main() async {
   await dotenv.load(fileName: ".env");
 
   await Firebase.initializeApp();
+  await AppLanguage.instance.start();
   print("Firebase initialized");
 
   runApp(const MyApp());
@@ -21,10 +25,44 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const bannerBlue = Colors.blueAccent;
-    return MaterialApp(
+    const appBackground = Color(0xFFF3F7FC);
+    return ListenableBuilder(
+      listenable: AppLanguage.instance,
+      builder: (context, _) {
+        return MaterialApp(
+      navigatorKey: appNavigatorKey,
       debugShowCheckedModeBanner: false,
+      themeMode: ThemeMode.light,
+      locale: AppLanguage.instance.locale,
+      supportedLocales: const [
+        Locale('en'),
+        Locale('es'),
+        Locale('zh'),
+        Locale('hi'),
+        Locale('pt'),
+        Locale('bn'),
+        Locale('ru'),
+        Locale('ja'),
+        Locale('tr'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      navigatorObservers: [_AppKeyboardNavObserver()],
+      builder: (context, child) {
+        return AppKeyboardScope(child: child ?? const SizedBox.shrink());
+      },
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: bannerBlue),
+        brightness: Brightness.light,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: bannerBlue,
+          brightness: Brightness.light,
+          surface: appBackground,
+        ),
+        scaffoldBackgroundColor: appBackground,
+        canvasColor: appBackground,
         appBarTheme: const AppBarTheme(
           backgroundColor: bannerBlue,
           foregroundColor: Colors.white,
@@ -47,5 +85,29 @@ class MyApp extends StatelessWidget {
       ),
       home: const Login(),
     );
+      },
+    );
+  }
+}
+
+class _AppKeyboardNavObserver extends NavigatorObserver {
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    AppKeyboardController.instance.hide();
+  }
+
+  @override
+  void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    AppKeyboardController.instance.hide();
+  }
+
+  @override
+  void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    AppKeyboardController.instance.hide();
+  }
+
+  @override
+  void didReplace({Route<dynamic>? newRoute, Route<dynamic>? oldRoute}) {
+    AppKeyboardController.instance.hide();
   }
 }

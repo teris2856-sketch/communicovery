@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/home_page.dart';
 
 class BodyCheckDetails1 extends StatefulWidget {
@@ -96,64 +97,68 @@ class _BodyCheckDetails1State extends State<BodyCheckDetails1> {
         painData = {};
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to load body check: $e")),
+        SnackBar(content: Text(AppLanguage.instance.t('failedLoadBody', {'error': '$e'}))),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
-      return Scaffold(
-        appBar: AppBar(
-          backgroundColor: Colors.blueAccent,
-          title: const Text("Body Check Results"),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
+    return AppLangBuilder(
+      builder: (context, t) {
+        if (isLoading) {
+          return Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.blueAccent,
+              title: Text(t('bodyCheckResults')),
+            ),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
-        title: const Text("Body Check Results"),
-      ),
-      body: Center(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            const Text(
-              "Pain Summary",
-              style: TextStyle(fontSize: 32),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 20),
-            if (painData.isEmpty) buildInfoContainer("No pain reported today. Great job!"),
-            ...painData.entries.map(
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.blueAccent,
+            title: Text(t('bodyCheckResults')),
+          ),
+          body: Center(
+            child: Column(
+              children: [
+                const SizedBox(height: 20),
+                Text(
+                  t('painSummary'),
+                  style: const TextStyle(fontSize: 32),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                if (painData.isEmpty) buildInfoContainer(t('noPainToday')),
+                ...painData.entries.map(
                   (entry) => buildPainContainer(entry.key, entry.value),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(builder: (context) => const HomePage()),
-                );
-              },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
                 ),
-                child: Text(
-                  "Back to home",
-                  style: TextStyle(fontSize: 22),
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(builder: (context) => const HomePage()),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    child: Text(
+                      t('backToHome'),
+                      style: const TextStyle(fontSize: 22),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 20),
+              ],
             ),
-            const SizedBox(height: 20),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -186,13 +191,16 @@ class _BodyCheckDetails1State extends State<BodyCheckDetails1> {
         child: Column(
           children: [
             Text(
-              bodyPart,
+              AppLanguage.instance.bodyPartLabel(bodyPart),
               style: const TextStyle(fontSize: 24),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              "Pain Level: $painLevel",
+              AppLanguage.instance.t(
+                'painLevelColon',
+                {'level': AppLanguage.instance.painLabel(painLevel)},
+              ),
               style: TextStyle(
                 fontSize: 22,
                 color: painColor,

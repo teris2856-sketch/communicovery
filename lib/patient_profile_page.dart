@@ -1,6 +1,9 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
+import 'package:swiftspeak/welcome_survey_page.dart';
 
 class PatientProfilePage extends StatefulWidget {
   const PatientProfilePage({super.key});
@@ -16,6 +19,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
 
   bool _loading = true;
   bool _savingName = false;
+  Map<String, dynamic> _survey = {};
 
   @override
   void initState() {
@@ -31,11 +35,16 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     }
 
     String name = user.displayName ?? '';
+    Map<String, dynamic> survey = {};
     try {
       final doc = await _firestore.collection('users').doc(user.uid).get();
       final fromDb = doc.data()?['displayName'] as String?;
       if (fromDb != null && fromDb.isNotEmpty) {
         name = fromDb;
+      }
+      final raw = doc.data()?['survey'];
+      if (raw is Map) {
+        survey = Map<String, dynamic>.from(raw);
       }
     } catch (_) {
       // Keep Auth display name
@@ -44,6 +53,7 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
     if (!mounted) return;
     setState(() {
       _nameController.text = name;
+      _survey = survey;
       _loading = false;
     });
   }
@@ -79,6 +89,49 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
       );
     } finally {
       if (mounted) setState(() => _savingName = false);
+    }
+  }
+
+  String _surveyValue(dynamic value) {
+    if (value is List) {
+      return value.map((item) => '$item').where((item) => item.isNotEmpty).join(', ');
+    }
+    return '$value'.trim();
+  }
+
+  List<Widget> _surveyTiles() {
+    final labels = <String, String>{
+      ...surveyQuestionLabels,
+      'petsNote': 'About their pets',
+      'funNote': 'Other things they enjoy',
+      'notes': 'Other notes',
+    };
+    final tiles = <Widget>[];
+    for (final entry in labels.entries) {
+      final text = _surveyValue(_survey[entry.key]);
+      if (text.isEmpty) continue;
+      tiles.add(
+        Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _InfoTile(label: entry.value, value: text),
+        ),
+      );
+    }
+    return tiles;
+  }
+
+  Future<void> _openSurvey() async {
+    final updated = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const WelcomeSurveyPage(
+          role: 'patient',
+          updateExisting: true,
+        ),
+      ),
+    );
+    if (updated == true && mounted) {
+      await _loadProfile();
     }
   }
 
@@ -146,36 +199,42 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
   @override
   Widget build(BuildContext context) {
     final user = _auth.currentUser;
+    final t = AppLanguage.instance.t;
 
+    return ListenableBuilder(
+      listenable: AppLanguage.instance,
+      builder: (context, _) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text('Profile'),
+        title: Text(t('profile')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : user == null
-              ? const Center(child: Text('Not signed in'))
+              ? Center(child: Text(t('notSignedIn')))
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      const Text(
-                        'Display name',
-                        style: TextStyle(
+                      Text(
+                        t('displayName'),
+                        style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
                       const SizedBox(height: 8),
-                      TextField(
+                      AppKeyboardField(
                         controller: _nameController,
+                        enableTidyUp: false,
+                        hideTidyUp: true,
                         textCapitalization: TextCapitalization.words,
                         decoration: InputDecoration(
                           filled: true,
                           fillColor: Colors.white,
-                          hintText: 'How you want to be called',
+                          hintText: t('displayNameHint'),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
                           ),
@@ -189,34 +248,105 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                           foregroundColor: Colors.white,
                         ),
                         child: Text(
-                          _savingName ? 'Saving…' : 'Save display name',
+                          _savingName ? t('saving') : t('saveDisplayName'),
                           style: const TextStyle(fontSize: 16),
                         ),
                       ),
                       const SizedBox(height: 28),
-                      const Text(
-                        'Account',
+                      Text(
+                        AppLanguage.instance.t('language'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        AppLanguage.instance.t('languageHelp'),
                         style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blueGrey.shade700,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final lang in AppLang.values)
+                            ChoiceChip(
+                              label: Text(lang.nativeName),
+                              selected:
+                                  AppLanguage.instance.lang == lang,
+                              selectedColor: Colors.blueAccent,
+                              labelStyle: TextStyle(
+                                color: AppLanguage.instance.lang == lang
+                                    ? Colors.white
+                                    : Colors.black87,
+                                fontWeight: FontWeight.w600,
+                              ),
+                              onSelected: (_) =>
+                                  AppLanguage.instance.setLang(lang),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        AppLanguage.instance.t('aLittleAboutYou'),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _survey.isEmpty
+                            ? t('surveyEmptyHelp')
+                            : t('surveyFilledHelp'),
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.blueGrey.shade700,
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      if (_survey.isNotEmpty) ..._surveyTiles(),
+                      ElevatedButton(
+                        onPressed: _openSurvey,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                        ),
+                        child: Text(
+                          _survey.isEmpty
+                              ? t('addQuestionnaire')
+                              : t('updateQuestionnaire'),
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Text(
+                        t('account'),
+                        style: const TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 12),
                       _InfoTile(
-                        label: 'Email',
+                        label: t('email'),
                         value: user.email ?? '—',
                       ),
                       const SizedBox(height: 8),
                       _InfoTile(
-                        label: 'Password',
+                        label: t('password'),
                         value: '••••••••',
-                        subtitle:
-                            'Your password is never shown. Use change password to update it.',
+                        subtitle: t('passwordHidden'),
                       ),
                       const SizedBox(height: 16),
                       OutlinedButton(
                         onPressed: _showChangePasswordDialog,
-                        child: const Text('Change password'),
+                        child: Text(t('changePassword')),
                       ),
                       const SizedBox(height: 24),
                       Text(
@@ -229,6 +359,8 @@ class _PatientProfilePageState extends State<PatientProfilePage> {
                     ],
                   ),
                 ),
+    );
+      },
     );
   }
 }
@@ -261,22 +393,28 @@ class _ChangePasswordDialogState extends State<_ChangePasswordDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextField(
+            AppKeyboardField(
               controller: _current,
+              enableTidyUp: false,
+              hideTidyUp: true,
               obscureText: true,
               decoration: const InputDecoration(
                 labelText: 'Current password',
               ),
             ),
-            TextField(
+            AppKeyboardField(
               controller: _next,
+              enableTidyUp: false,
+              hideTidyUp: true,
               obscureText: true,
               decoration: const InputDecoration(
                 labelText: 'New password',
               ),
             ),
-            TextField(
+            AppKeyboardField(
               controller: _confirm,
+              enableTidyUp: false,
+              hideTidyUp: true,
               obscureText: true,
               decoration: const InputDecoration(
                 labelText: 'Confirm new password',

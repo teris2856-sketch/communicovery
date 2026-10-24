@@ -2,8 +2,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'home_page.dart';
-import 'staff_home_page.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
+import 'welcome_survey_page.dart';
 
 class Signup extends StatefulWidget {
   const Signup({super.key});
@@ -58,6 +59,8 @@ class _SignupState extends State<Signup> {
           'email': email,
           'role': selectedRole,
           'createdAt': FieldValue.serverTimestamp(),
+          'surveyCompleted': false,
+          'language': AppLanguage.instance.code,
         };
         if (displayName.isNotEmpty) {
           profile['displayName'] = displayName;
@@ -70,18 +73,12 @@ class _SignupState extends State<Signup> {
 
       if (!mounted) return;
 
-      // Navigate based on role
-      if (selectedRole == "patient") {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const HomePage()),
-              (route) => false,
-        );
-      } else if (selectedRole == "staff") {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (_) => const StaffHomePage()),
-              (route) => false,
-        );
-      }
+      Navigator.of(context).pushAndRemoveUntil(
+        MaterialPageRoute(
+          builder: (_) => WelcomeSurveyPage(role: selectedRole!),
+        ),
+        (route) => false,
+      );
     } on FirebaseAuthException catch (e) {
       String message;
       switch (e.code) {
@@ -160,28 +157,34 @@ class _SignupState extends State<Signup> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: AppLanguage.instance,
+      builder: (context, _) {
+        final t = AppLanguage.instance.t;
+        return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text('Sign Up'),
+        title: Text(t('signUp')),
       ),
       body: Center(
         child: SingleChildScrollView( // ensures screen scrolls if keyboard covers fields
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text("Sign Up", style: TextStyle(fontSize: 50)),
+              Text(t('signUp'), style: const TextStyle(fontSize: 50)),
               const SizedBox(height: 20),
 
               Padding(
                 padding: const EdgeInsets.all(10),
-                child: TextField(
+                child: AppKeyboardField(
                   controller: nameController,
+                  enableTidyUp: false,
+                  hideTidyUp: true,
                   textCapitalization: TextCapitalization.words,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    hintText: "Your name (optional)",
+                    hintText: t('yourNameOptional'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -191,12 +194,14 @@ class _SignupState extends State<Signup> {
 
               Padding(
                 padding: const EdgeInsets.all(10),
-                child: TextField(
+                child: AppKeyboardField(
                   controller: emailController,
+                  enableTidyUp: false,
+                  hideTidyUp: true,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    hintText: "Email",
+                    hintText: t('email'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -206,13 +211,15 @@ class _SignupState extends State<Signup> {
 
               Padding(
                 padding: const EdgeInsets.all(10),
-                child: TextField(
+                child: AppKeyboardField(
                   controller: passwordController,
+                  enableTidyUp: false,
+                  hideTidyUp: true,
                   obscureText: true,
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    hintText: "Password",
+                    hintText: t('password'),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -221,16 +228,16 @@ class _SignupState extends State<Signup> {
               ),
 
               const SizedBox(height: 10),
-              const Text("Select Role", style: TextStyle(fontSize: 18)),
+              Text(t('selectRole'), style: const TextStyle(fontSize: 18)),
               const SizedBox(height: 10),
 
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
-                    roleButton("Patient", "patient"),
+                    roleButton(t('patient'), "patient"),
                     const SizedBox(width: 10),
-                    roleButton("Hospital Staff", "staff"),
+                    roleButton(t('hospitalStaff'), "staff"),
                   ],
                 ),
               ),
@@ -243,7 +250,7 @@ class _SignupState extends State<Signup> {
                 ),
                 onPressed: _isLoading ? null : signUpUser,
                 child: Text(
-                  _isLoading ? "Creating..." : "Create Account",
+                  _isLoading ? t('creating') : t('createAccount'),
                   style: const TextStyle(fontSize: 18),
                 ),
               ),
@@ -251,6 +258,8 @@ class _SignupState extends State<Signup> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

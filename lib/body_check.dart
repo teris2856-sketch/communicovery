@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/body_check_history.dart';
 import 'package:swiftspeak/body_check_results.dart';
 import 'package:swiftspeak/body_check_service.dart';
@@ -38,26 +39,21 @@ class _BodyCheckState extends State<BodyCheck> {
   }
 
   static String _spotLabel(String id) {
-    if (id == 'spot9') return 'Lower abdomen';
+    final lang = AppLanguage.instance;
+    if (id == 'spot9') return lang.t('bodyLowerAbdomen');
     if (id == 'LeftHip' || id == 'RightHip') {
-      return id == 'LeftHip' ? 'Left hip' : 'Right hip';
+      return lang.t(id == 'LeftHip' ? 'bodyLeftHip' : 'bodyRightHip');
     }
     if (id == 'LeftElbow' || id == 'RightElbow') {
-      return id == 'LeftElbow' ? 'Left upper arm' : 'Right upper arm';
+      return lang.t(id == 'LeftElbow' ? 'bodyLeftElbow' : 'bodyRightElbow');
     }
     if (id == 'LeftHand' || id == 'RightHand') {
-      return id == 'LeftHand' ? 'Left forearm' : 'Right forearm';
+      return lang.t(id == 'LeftHand' ? 'bodyLeftHand' : 'bodyRightHand');
     }
     if (id.endsWith('Palm')) {
-      return id.contains('Left') ? 'Left hand' : 'Right hand';
+      return id.contains('Left') ? lang.t('bodyLeftHand') : lang.t('bodyRightHand');
     }
-    if (id.contains('Knee') && id.startsWith('Side')) {
-      return 'Lower leg';
-    }
-    var s = id;
-    if (s.startsWith('Side')) s = s.substring(4);
-    if (s.startsWith('Back')) s = s.substring(4);
-    return s.replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}');
+    return lang.bodyPartLabel(id);
   }
 
   void _cyclePainLevel(String id, Map<String, PainLevel> levels) {
@@ -238,7 +234,7 @@ class _BodyCheckState extends State<BodyCheck> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to submit body check: $e")),
+        SnackBar(content: Text(AppLanguage.instance.t('failedSubmitBody', {'error': '$e'}))),
       );
     }
   }
@@ -257,10 +253,12 @@ class _BodyCheckState extends State<BodyCheck> {
 
   @override
   Widget build(BuildContext context) {
+    return AppLangBuilder(
+      builder: (context, t) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text("Body Check"),
+        title: Text(t('bodyCheck')),
         actions: [
           TextButton(
             onPressed: () {
@@ -268,9 +266,9 @@ class _BodyCheckState extends State<BodyCheck> {
                 MaterialPageRoute(builder: (_) => const BodyCheckHistory()),
               );
             },
-            child: const Text(
-              "History",
-              style: TextStyle(
+            child: Text(
+              t('history'),
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 21,
               ),
@@ -286,7 +284,7 @@ class _BodyCheckState extends State<BodyCheck> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                  "Drag horizontally to rotate. Markers track the body — Front, Back, Left Side, and Right Side.",
+                  t('bodyCheckHelp'),
                 style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
@@ -424,7 +422,7 @@ class _BodyCheckState extends State<BodyCheck> {
                                 right: 0,
                                 bottom: 6,
                                 child: Text(
-                                  'Drag left or right to rotate',
+                                  t('dragToRotate'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     color: Colors.grey[400],
@@ -450,11 +448,11 @@ class _BodyCheckState extends State<BodyCheck> {
                     padding: const EdgeInsets.fromLTRB(10, 0, 0, 0),
                     child: Column(
                       children: [
-                        const Padding(
-                          padding: EdgeInsets.all(1.0),
+                        Padding(
+                          padding: const EdgeInsets.all(1.0),
                           child: Text(
-                            "Pain Level",
-                            style: TextStyle(
+                            t('painLevel'),
+                            style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
@@ -462,36 +460,36 @@ class _BodyCheckState extends State<BodyCheck> {
                         ),
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            CircleAvatar(
+                          children: [
+                            const CircleAvatar(
                               radius: 10,
                               backgroundImage: NetworkImage(
                                 "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRISgUY1LYyDbI6iMh6s2JuDGdewgUgYSs9Ag&s",
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Text("Low"),
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(t('painLow')),
                             ),
-                            CircleAvatar(
+                            const CircleAvatar(
                               radius: 10,
                               backgroundImage: NetworkImage(
                                 "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQNpQQIlRMWZLe4IuUKjstO0pVXmvCLP8A3lg&s",
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Text("Moderate"),
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(t('painModerate')),
                             ),
-                            CircleAvatar(
+                            const CircleAvatar(
                               radius: 10,
                               backgroundImage: NetworkImage(
                                 "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRZwznd8328FB3mHv3HorzAnwKy6w0KxXjREg&s",
                               ),
                             ),
                             Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Text("High"),
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(t('painHigh')),
                             ),
                           ],
                         ),
@@ -502,9 +500,9 @@ class _BodyCheckState extends State<BodyCheck> {
                     padding: const EdgeInsets.fromLTRB(0, 0, 10, 0),
                     child: ElevatedButton(
                       onPressed: _submit,
-                      child: const Text(
-                        "Submit",
-                        style: TextStyle(fontSize: 18.0),
+                      child: Text(
+                        t('submit'),
+                        style: const TextStyle(fontSize: 18.0),
                       ),
                     ),
                   ),
@@ -515,5 +513,7 @@ class _BodyCheckState extends State<BodyCheck> {
         ),
       ),
     );
+      },
+    );
   }
-  }
+}

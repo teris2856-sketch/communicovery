@@ -4,6 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:swiftspeak/ai_chat_service.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
+import 'package:swiftspeak/typing_prediction.dart';
 
 enum CommunityFilter {
   forYou,
@@ -18,55 +22,58 @@ enum CommunityFilter {
 
 extension CommunityFilterLabel on CommunityFilter {
   String get label {
+    final t = AppLanguage.instance.t;
     switch (this) {
       case CommunityFilter.forYou:
-        return 'For you';
+        return t('forYou');
       case CommunityFilter.all:
-        return 'All';
+        return t('all');
       case CommunityFilter.latest:
-        return 'Latest';
+        return t('latest');
       case CommunityFilter.gettingStarted:
-        return 'Getting Started';
+        return t('gettingStarted');
       case CommunityFilter.unanswered:
-        return 'Unanswered';
+        return t('unanswered');
       case CommunityFilter.faqs:
-        return 'FAQs';
+        return t('faqs');
       case CommunityFilter.yourQuestions:
-        return 'Your questions';
+        return t('yourQuestions');
       case CommunityFilter.saved:
-        return 'Saved';
+        return t('saved');
     }
   }
 
   String get feedTitle {
+    final t = AppLanguage.instance.t;
     switch (this) {
       case CommunityFilter.forYou:
-        return 'Conversations for you';
+        return t('feedForYou');
       case CommunityFilter.all:
-        return 'All conversations';
+        return t('feedAll');
       case CommunityFilter.latest:
-        return 'Latest conversations';
+        return t('feedLatest');
       case CommunityFilter.gettingStarted:
-        return 'Getting started';
+        return t('feedGettingStarted');
       case CommunityFilter.unanswered:
-        return 'Unanswered questions';
+        return t('feedUnanswered');
       case CommunityFilter.faqs:
-        return 'FAQs';
+        return t('feedFaqs');
       case CommunityFilter.yourQuestions:
-        return 'Questions you asked';
+        return t('feedYourQuestions');
       case CommunityFilter.saved:
-        return 'Saved conversations';
+        return t('feedSaved');
     }
   }
 
   String get emptyMessage {
+    final t = AppLanguage.instance.t;
     switch (this) {
       case CommunityFilter.yourQuestions:
-        return 'You have not asked a question yet. Tap Ask the Community to post one.';
+        return t('emptyYourQuestions');
       case CommunityFilter.saved:
-        return 'No saved conversations yet. Tap the bookmark on a post to save it here.';
+        return t('emptySaved');
       default:
-        return 'No posts here yet. Ask the community so other people can see it.';
+        return t('emptyPosts');
     }
   }
 }
@@ -77,9 +84,9 @@ extension CommunityRoleLabel on CommunityRole {
   String get label {
     switch (this) {
       case CommunityRole.recoveryMember:
-        return 'Recovery member';
+        return AppLanguage.instance.t('recoveryMember');
       case CommunityRole.caregiver:
-        return 'Caregiver';
+        return AppLanguage.instance.t('caregiver');
     }
   }
 }
@@ -1017,7 +1024,10 @@ class _CommunityPageState extends State<CommunityPage> {
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: CommunityStore.instance,
+      listenable: Listenable.merge([
+        CommunityStore.instance,
+        AppLanguage.instance,
+      ]),
       builder: (context, _) {
         final store = CommunityStore.instance;
         final posts = _visiblePosts;
@@ -1027,26 +1037,27 @@ class _CommunityPageState extends State<CommunityPage> {
         backgroundColor: Colors.blueAccent,
         centerTitle: true,
         title: _searching
-            ? TextField(
+            ? AppKeyboardField(
                 autofocus: true,
+                enableTidyUp: true,
                 style: const TextStyle(color: Colors.white),
                 cursorColor: Colors.white,
-                decoration: const InputDecoration(
-                  hintText: 'Search community',
-                  hintStyle: TextStyle(color: Colors.white70),
+                decoration: InputDecoration(
+                  hintText: AppLanguage.instance.t('searchCommunity'),
+                  hintStyle: const TextStyle(color: Colors.white70),
                   border: InputBorder.none,
                 ),
                 onChanged: (value) => setState(() => _query = value),
               )
-            : const Text('Community'),
+            : Text(AppLanguage.instance.t('community')),
         actions: [
           IconButton(
-            tooltip: 'Community rules',
+            tooltip: AppLanguage.instance.t('communityRules'),
             icon: const Icon(Icons.menu_book_outlined),
             onPressed: _openRules,
           ),
           IconButton(
-            tooltip: 'Notifications',
+            tooltip: AppLanguage.instance.t('notifications'),
             onPressed: () {
               Navigator.push(
                 context,
@@ -1064,12 +1075,17 @@ class _CommunityPageState extends State<CommunityPage> {
             ),
           ),
           IconButton(
-            tooltip: _searching ? 'Close search' : 'Search',
+            tooltip: _searching
+                ? AppLanguage.instance.t('closeSearch')
+                : AppLanguage.instance.t('search'),
             icon: Icon(_searching ? Icons.close : Icons.search),
             onPressed: () {
               setState(() {
                 _searching = !_searching;
-                if (!_searching) _query = '';
+                if (!_searching) {
+                  _query = '';
+                  AppKeyboardController.instance.hide();
+                }
               });
             },
           ),
@@ -1084,8 +1100,8 @@ class _CommunityPageState extends State<CommunityPage> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        const Text(
-                          'Could not load the community. Check that you are signed in, then try again.',
+                        Text(
+                          AppLanguage.instance.t('couldNotLoadCommunity'),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 16),
@@ -1094,7 +1110,7 @@ class _CommunityPageState extends State<CommunityPage> {
                           style: FilledButton.styleFrom(
                             backgroundColor: Colors.blueAccent,
                           ),
-                          child: const Text('Try again'),
+                          child: Text(AppLanguage.instance.t('tryAgain')),
                         ),
                       ],
                     ),
@@ -1103,15 +1119,14 @@ class _CommunityPageState extends State<CommunityPage> {
               : ListView(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
               children: [
-                const _SafetyBanner(
-                  text:
-                      'This community shares lived experience, not medical advice. For urgent symptoms, contact your care team or local emergency services.',
+                _SafetyBanner(
+                  text: AppLanguage.instance.t('safetyBanner'),
                 ),
                 const SizedBox(height: 14),
                 FilledButton.icon(
                   onPressed: _askCommunity,
                   icon: const Icon(Icons.add),
-                  label: const Text('Ask the Community'),
+                  label: Text(AppLanguage.instance.t('askTheCommunity')),
                   style: FilledButton.styleFrom(
                     backgroundColor: Colors.blueAccent,
                     foregroundColor: Colors.white,
@@ -1129,7 +1144,7 @@ class _CommunityPageState extends State<CommunityPage> {
                 OutlinedButton.icon(
                   onPressed: _openRules,
                   icon: const Icon(Icons.menu_book_outlined),
-                  label: const Text('Community rules'),
+                  label: Text(AppLanguage.instance.t('communityRules')),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.blueAccent,
                     minimumSize: const Size.fromHeight(48),
@@ -1348,11 +1363,14 @@ class _MentionFieldState extends State<_MentionField> {
               ],
             ),
           ),
-        TextField(
+        AppKeyboardField(
           controller: widget.controller,
           minLines: widget.minLines,
           maxLines: widget.maxLines,
           textCapitalization: widget.textCapitalization,
+          enableTidyUp: true,
+          enablePredictions: true,
+          predictionSurface: 'community',
           decoration: InputDecoration(
             hintText: widget.hintText,
             filled: true,
@@ -1773,6 +1791,10 @@ class _AskCommunityPageState extends State<_AskCommunityPage> {
           tags: _tags.toList(),
         ),
       );
+      TypingPredictionStore.instance.learnFromCommitted(
+        [title, body].where((part) => part.trim().isNotEmpty).join('. '),
+        surface: 'community',
+      );
       if (!mounted) return;
       Navigator.pop(context, true);
     } catch (error) {
@@ -1789,15 +1811,15 @@ class _AskCommunityPageState extends State<_AskCommunityPage> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text('Ask the Community'),
+        title: Text(AppLanguage.instance.t('askTheCommunity')),
       ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: ListView(
           children: [
-            const Text(
-              'I am a',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            Text(
+              AppLanguage.instance.t('iAmA'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1820,21 +1842,21 @@ class _AskCommunityPageState extends State<_AskCommunityPage> {
             const SizedBox(height: 16),
             _MentionField(
               controller: _title,
-              hintText: 'Title for your question',
+              hintText: AppLanguage.instance.t('titleForQuestion'),
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 12),
             _MentionField(
               controller: _text,
-              hintText: 'Write the question. Use @name to mention someone.',
+              hintText: AppLanguage.instance.t('writeQuestion'),
               minLines: 4,
               maxLines: 8,
               textCapitalization: TextCapitalization.sentences,
             ),
             const SizedBox(height: 16),
-            const Text(
-              'Tags',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            Text(
+              AppLanguage.instance.t('tags'),
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -1844,7 +1866,7 @@ class _AskCommunityPageState extends State<_AskCommunityPage> {
                 for (final tag in communityTagOptions)
                   FilterChip(
                     showCheckmark: false,
-                    label: Text(tag),
+                    label: Text(AppLanguage.instance.tagLabel(tag)),
                     selected: _tags.contains(tag),
                     selectedColor: Colors.blueAccent.shade100,
                     onSelected: (selected) {
@@ -1870,7 +1892,7 @@ class _AskCommunityPageState extends State<_AskCommunityPage> {
                 backgroundColor: Colors.blueAccent,
                 minimumSize: const Size.fromHeight(48),
               ),
-              child: const Text('Post'),
+              child: Text(AppLanguage.instance.t('post')),
             ),
           ],
         ),
@@ -1894,6 +1916,15 @@ class _CommunityPostPage extends StatefulWidget {
 
 class _CommunityPostPageState extends State<_CommunityPostPage> {
   final _reply = TextEditingController();
+  final _ai = AiChatService();
+
+  var _showingTranslation = false;
+  var _translating = false;
+  String? _translatedTitle;
+  String? _translatedText;
+  String? _translatedForLang;
+  final _translatedReplies = <String, String>{};
+  List<CommunityReply> _latestReplies = const [];
 
   CommunityPost? get _post {
     for (final post in CommunityStore.instance.posts) {
@@ -1933,6 +1964,10 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
           createdAt: DateTime.now(),
         ),
       );
+      TypingPredictionStore.instance.learnFromCommitted(
+        text,
+        surface: 'community',
+      );
       _reply.clear();
     } catch (error) {
       if (!mounted) return;
@@ -1952,17 +1987,103 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _toggleTranslation(CommunityPost post) async {
+    if (_translating) return;
+    if (_showingTranslation) {
+      setState(() => _showingTranslation = false);
+      return;
+    }
+
+    final langCode = AppLanguage.instance.code;
+    final targetLanguage = AppLanguage.instance.englishName;
+    final replies = _latestReplies;
+    final cacheReady = _translatedForLang == langCode &&
+        _translatedTitle != null &&
+        _translatedText != null &&
+        replies.every((reply) => _translatedReplies.containsKey(reply.id));
+    if (cacheReady) {
+      setState(() => _showingTranslation = true);
+      return;
+    }
+
+    setState(() => _translating = true);
+    try {
+      final texts = <String, String>{
+        'title': post.title,
+        'text': post.text,
+        for (final reply in replies) 'reply_${reply.id}': reply.text,
+      };
+      final translated = await _ai.translateTexts(
+        texts: texts,
+        targetLanguage: targetLanguage,
+      );
+      if (!mounted) return;
+      setState(() {
+        _translatedTitle = translated['title'] ?? post.title;
+        _translatedText = translated['text'] ?? post.text;
+        for (final reply in replies) {
+          _translatedReplies[reply.id] =
+              translated['reply_${reply.id}'] ?? reply.text;
+        }
+        _translatedForLang = langCode;
+        _showingTranslation = true;
+        _translating = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _translating = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            AppLanguage.instance.t('translateFailed', {'error': '$error'}),
+          ),
+        ),
+      );
+    }
+  }
+
+  Widget _translateButton(CommunityPost post) {
+    final t = AppLanguage.instance.t;
+    final label = _translating
+        ? t('translatingPost')
+        : _showingTranslation
+            ? t('showOriginal')
+            : t('translatePost');
+    return OutlinedButton.icon(
+      onPressed: _translating ? null : () => _toggleTranslation(post),
+      icon: _translating
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Icon(
+              _showingTranslation
+                  ? Icons.undo
+                  : Icons.translate,
+            ),
+      label: Text(label),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: Colors.blueAccent,
+        side: const BorderSide(color: Colors.blueAccent),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: CommunityStore.instance,
+      listenable: Listenable.merge([
+        CommunityStore.instance,
+        AppLanguage.instance,
+      ]),
       builder: (context, _) {
         final post = _post;
         if (post == null) {
           return Scaffold(
             appBar: AppBar(
               backgroundColor: Colors.blueAccent,
-              title: const Text('Post'),
+              title: Text(AppLanguage.instance.t('post')),
             ),
             body: CommunityStore.instance.loading
                 ? const Center(child: CircularProgressIndicator())
@@ -1972,12 +2093,28 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
 
         final saved = CommunityStore.instance.savedIds.contains(post.id);
         final helpful = post.isHelpfulFor(_userId);
+        final title = _showingTranslation
+            ? (_translatedTitle ?? post.title)
+            : post.title;
+        final body = _showingTranslation
+            ? (_translatedText ?? post.text)
+            : post.text;
 
         return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
         title: Text(post.role.label),
         actions: [
+          IconButton(
+            tooltip: _showingTranslation
+                ? AppLanguage.instance.t('showOriginal')
+                : AppLanguage.instance.t('translatePost'),
+            onPressed:
+                _translating ? null : () => _toggleTranslation(post),
+            icon: Icon(
+              _showingTranslation ? Icons.undo : Icons.translate,
+            ),
+          ),
           IconButton(
             tooltip: saved ? 'Remove save' : 'Save conversation',
             onPressed: _toggleSaved,
@@ -2024,7 +2161,7 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
                           ),
                           const SizedBox(height: 6),
                           Text(
-                            post.title,
+                            title,
                             style: const TextStyle(
                               fontSize: 20,
                               fontWeight: FontWeight.w800,
@@ -2033,7 +2170,7 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
                           const SizedBox(height: 6),
                           Text.rich(
                             mentionTextSpan(
-                              post.text,
+                              body,
                               const TextStyle(fontSize: 16),
                             ),
                           ),
@@ -2049,10 +2186,21 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
                     runSpacing: 8,
                     children: [
                       for (final tag in post.tags)
-                        Chip(label: Text(tag)),
+                        Chip(
+                          label: Text(
+                            _showingTranslation
+                                ? AppLanguage.instance.tagLabel(tag)
+                                : tag,
+                          ),
+                        ),
                     ],
                   ),
                 ],
+                const SizedBox(height: 12),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: _translateButton(post),
+                ),
                 const SizedBox(height: 8),
                 Align(
                   alignment: Alignment.centerLeft,
@@ -2070,6 +2218,7 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
                   stream: CommunityStore.instance.repliesStream(widget.postId),
                   builder: (context, snapshot) {
                     final replies = snapshot.data ?? const <CommunityReply>[];
+                    _latestReplies = replies;
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -2112,7 +2261,14 @@ class _CommunityPostPageState extends State<_CommunityPostPage> {
                                           fontWeight: FontWeight.w700,
                                         ),
                                       ),
-                                      Text.rich(mentionTextSpan(reply.text)),
+                                      Text.rich(
+                                        mentionTextSpan(
+                                          _showingTranslation
+                                              ? (_translatedReplies[reply.id] ??
+                                                  reply.text)
+                                              : reply.text,
+                                        ),
+                                      ),
                                     ],
                                   ),
                                 ),
@@ -2365,18 +2521,18 @@ class _CommunityRulesPage extends StatelessWidget {
       backgroundColor: const Color(0xFFF7F8FA),
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text('How we talk here'),
+        title: Text(AppLanguage.instance.t('communityRules')),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
         children: [
-          const Text(
-            'Community rules',
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+          Text(
+            AppLanguage.instance.t('communityRules'),
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 8),
           Text(
-            'This space is for lived experience. It is not clinical guidance.',
+            AppLanguage.instance.t('rulesIntro'),
             style: TextStyle(
               fontSize: 16,
               height: 1.4,

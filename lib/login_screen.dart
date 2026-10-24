@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,23 +15,27 @@ class _LoginScreenState extends State<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: Text("Login"),
+        title: Text(AppLanguage.instance.t('login')),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Text(
-                "Login",
-        style: TextStyle(fontSize: 35),
+                AppLanguage.instance.t('login'),
+        style: const TextStyle(fontSize: 35),
             ),
-            TextField(
+            AppKeyboardField(
+              enableTidyUp: false,
+              hideTidyUp: true,
               decoration: InputDecoration(
                 border: OutlineInputBorder(),
                 labelText: "Name/Email/Phone Number"
               ),
             ),
-            TextField(
+            AppKeyboardField(
+              enableTidyUp: false,
+              hideTidyUp: true,
               decoration: InputDecoration(
                   border: OutlineInputBorder(),
                   labelText: "Password"

@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/home_page.dart';
 import 'package:swiftspeak/ai_chat_service.dart';
+import 'package:swiftspeak/typing_prediction.dart';
 
 class Message {
   final String text;
@@ -26,14 +29,14 @@ class _AiChatbotState extends State<AiChatbot> {
 
   final List<List<Message>> _allChats = [
     [
-      Message(text: "Hello! How can I help you today?", isUser: false),
+      Message(text: AppLanguage.instance.t('helloHelp'), isUser: false),
     ]
   ];
 
   @override
   void initState() {
     super.initState();
-    _flutterTts.setLanguage("en-US");
+    _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
     _flutterTts.setSpeechRate(0.5);
     _flutterTts.setPitch(1.0);
   }
@@ -41,6 +44,10 @@ class _AiChatbotState extends State<AiChatbot> {
   Future<void> _sendUserMessage() async {
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    TypingPredictionStore.instance.learnFromCommitted(
+      text,
+      surface: 'chatbot',
+    );
 
     setState(() {
       _isLoading = true;
@@ -54,6 +61,7 @@ class _AiChatbotState extends State<AiChatbot> {
           .toList();
 
       final reply = await _ai.generateAssistantReply(chatMessages: chatPayload);
+      TypingPredictionStore.instance.setConversationHint(reply);
 
       setState(() {
         _allChats[_currentChatIndex].add(Message(text: reply, isUser: false));
@@ -61,7 +69,7 @@ class _AiChatbotState extends State<AiChatbot> {
     } catch (e) {
       setState(() {
         _allChats[_currentChatIndex].add(
-          Message(text: "AI Error: $e", isUser: false),
+          Message(text: AppLanguage.instance.t('aiError', {'error': '$e'}), isUser: false),
         );
       });
     } finally {
@@ -85,13 +93,13 @@ class _AiChatbotState extends State<AiChatbot> {
 
       setState(() {
         _allChats[_currentChatIndex].add(
-          Message(text: "AI Recommendation:\n$rec", isUser: false),
+          Message(text: "${AppLanguage.instance.t('aiRecPrefix')}\n$rec", isUser: false),
         );
       });
     } catch (e) {
       setState(() {
         _allChats[_currentChatIndex].add(
-          Message(text: "AI Recommendation Error: $e", isUser: false),
+          Message(text: AppLanguage.instance.t('aiRecError', {'error': '$e'}), isUser: false),
         );
       });
     } finally {
@@ -103,6 +111,7 @@ class _AiChatbotState extends State<AiChatbot> {
 
   /// Speaks the last *app/assistant* message (NOT the user message).
   Future<void> _speakLastAppMessage() async {
+    await _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
     for (int i = _allChats[_currentChatIndex].length - 1; i >= 0; i--) {
       final msg = _allChats[_currentChatIndex][i];
       if (!msg.isUser) {
@@ -131,20 +140,22 @@ class _AiChatbotState extends State<AiChatbot> {
 
   @override
   Widget build(BuildContext context) {
+    return AppLangBuilder(
+      builder: (context, t) {
     return Scaffold(
-      backgroundColor: Colors.blueAccent.withValues(alpha: 0.08),
+      backgroundColor: const Color(0xFFF3F7FC),
 
       // ------------------ DRAWER ------------------
       drawer: Drawer(
         child: Column(
           children: [
-            const DrawerHeader(
-              decoration: BoxDecoration(color: Colors.blueAccent),
+            DrawerHeader(
+              decoration: const BoxDecoration(color: Colors.blueAccent),
               child: Align(
                 alignment: Alignment.bottomLeft,
                 child: Text(
-                  "Your Chats",
-                  style: TextStyle(
+                  t('yourChats'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -158,7 +169,7 @@ class _AiChatbotState extends State<AiChatbot> {
               padding: const EdgeInsets.symmetric(horizontal: 12),
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.add),
-                label: const Text("New Chat"),
+                label: Text(t('newChat')),
                 style: ElevatedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 45),
                 ),
@@ -166,7 +177,7 @@ class _AiChatbotState extends State<AiChatbot> {
                   setState(() {
                     _allChats.add([
                       Message(
-                        text: "Hello! How can I help you today?",
+                        text: t('helloHelp'),
                         isUser: false,
                       )
                     ]);
@@ -186,7 +197,7 @@ class _AiChatbotState extends State<AiChatbot> {
                 itemCount: _allChats.length,
                 itemBuilder: (context, index) {
                   return ListTile(
-                    title: Text("Chat ${index + 1}"),
+                    title: Text(t('chatN', {'n': '${index + 1}'})),
                     selected: index == _currentChatIndex,
                     onTap: () {
                       setState(() {
@@ -204,7 +215,7 @@ class _AiChatbotState extends State<AiChatbot> {
             // Back to Home
             ListTile(
               leading: const Icon(Icons.home),
-              title: const Text("Back to Home"),
+              title: Text(t('backToHome')),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -220,7 +231,7 @@ class _AiChatbotState extends State<AiChatbot> {
       // ------------------ END DRAWER ------------------
 
       appBar: AppBar(
-        title: const Text('AI Chatbot'),
+        title: Text(t('aiChatbot')),
         backgroundColor: Colors.blueAccent,
       ),
 
@@ -231,9 +242,9 @@ class _AiChatbotState extends State<AiChatbot> {
               padding: const EdgeInsets.all(12),
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.psychology, color: Colors.white),
-                label: const Text(
-                  "AI Recommendation",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+                label: Text(
+                  t('aiRecommendation'),
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
@@ -263,12 +274,15 @@ class _AiChatbotState extends State<AiChatbot> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: AppKeyboardField(
                       controller: _controller,
+                      enableTidyUp: true,
+                      enablePredictions: true,
+                      predictionSurface: 'chatbot',
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
-                        hintText: "Type your message...",
+                        hintText: t('typeMessage'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -292,15 +306,17 @@ class _AiChatbotState extends State<AiChatbot> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.blueAccent,
                 ),
-                child: const Text(
-                  "Text-to-Speech",
-                  style: TextStyle(fontSize: 18),
+                child: Text(
+                  t('textToSpeech'),
+                  style: const TextStyle(fontSize: 18),
                 ),
               ),
             ),
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

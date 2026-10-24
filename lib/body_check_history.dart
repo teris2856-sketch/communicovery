@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'package:swiftspeak/app_language.dart';
 import 'body_check_details1.dart';
 import 'home_page.dart';
 
@@ -56,9 +57,11 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
 
   @override
   Widget build(BuildContext context) {
+    return AppLangBuilder(
+      builder: (context, t) {
     return Scaffold(
       appBar: AppBar(
-        title: Text("Body Check History"),
+        title: Text(t('bodyCheckHistory')),
         backgroundColor: Colors.blueAccent,
         centerTitle: true,
       ),
@@ -73,19 +76,25 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
                 children: [
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      key: ValueKey('body-month-${AppLanguage.instance.code}-$selectedMonth'),
                       initialValue: selectedMonth,
                       decoration: InputDecoration(
-                        labelText: "Month",
+                        labelText: t('month'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
                         fillColor: Colors.blueAccent.withValues(alpha: 0.08),
                       ),
+                      selectedItemBuilder: (context) => months
+                          .map((month) => Text(
+                                AppLanguage.instance.monthLabel(month),
+                              ))
+                          .toList(),
                       items: months.map((month) {
                         return DropdownMenuItem(
                           value: month,
-                          child: Text(month),
+                          child: Text(AppLanguage.instance.monthLabel(month)),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -98,19 +107,25 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      key: ValueKey('body-year-${AppLanguage.instance.code}-$selectedYear'),
                       initialValue: selectedYear,
                       decoration: InputDecoration(
-                        labelText: "Year",
+                        labelText: t('year'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                         filled: true,
                         fillColor: Colors.blueAccent.withValues(alpha: 0.08),
                       ),
+                      selectedItemBuilder: (context) => years
+                          .map((year) => Text(
+                                AppLanguage.instance.yearLabel(year),
+                              ))
+                          .toList(),
                       items: years.map((year) {
                         return DropdownMenuItem(
                           value: year,
-                          child: Text(year),
+                          child: Text(AppLanguage.instance.yearLabel(year)),
                         );
                       }).toList(),
                       onChanged: (value) {
@@ -167,7 +182,7 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
                     if (items.isEmpty) {
                       return Center(
                         child: Text(
-                          "No results found",
+                          t('noResultsFound'),
                           style: TextStyle(fontSize: 24, color: Colors.grey[700]),
                         ),
                       );
@@ -232,8 +247,8 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
                 child: ElevatedButton.icon(
                   icon: Icon(Icons.home),
                   label: Text(
-                    "Back to Home",
-                    style: TextStyle(fontSize: 24),
+                    t('backToHome'),
+                    style: const TextStyle(fontSize: 24),
                   ),
                   style: ElevatedButton.styleFrom(
                     padding: EdgeInsets.symmetric(vertical: 14),
@@ -253,6 +268,8 @@ class _BodyCheckHistoryState extends State<BodyCheckHistory> {
           ),
         ),
       ),
+    );
+      },
     );
   }
 }

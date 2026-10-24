@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/mood_check2.dart';
 import 'mood_check4.dart';
 
@@ -18,57 +19,54 @@ class _MoodCheckState extends State<MoodCheck> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
-        title: const Text('Mood Check'),
-      ),
-      body: Center(
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          const Text("How are you doing today?", style: TextStyle(fontSize: 30)),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            child: const Text("😊 Good", style: TextStyle(fontSize: 30)),
-            onPressed: () => _goToSliders("Good"),
+    return AppLangBuilder(
+      builder: (context, t) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.blueAccent,
+            title: Text(t('moodCheck')),
           ),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            child: const Text("🙂 Okay", style: TextStyle(fontSize: 30)),
-            onPressed: () => _goToSliders("Okay"),
+          body: Center(
+            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              Text(t('howAreYouToday'), style: const TextStyle(fontSize: 30)),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                child: Text("😊 ${t('moodGood')}", style: const TextStyle(fontSize: 30)),
+                onPressed: () => _goToSliders("Good"),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                child: Text("🙂 ${t('moodOkay')}", style: const TextStyle(fontSize: 30)),
+                onPressed: () => _goToSliders("Okay"),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                child: Text("😐 ${t('moodNeutral')}", style: const TextStyle(fontSize: 30)),
+                onPressed: () => _goToSliders("Neutral"),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                child: Text("🙁 ${t('moodNotGood')}", style: const TextStyle(fontSize: 30)),
+                onPressed: () => _goToSliders("Not Good"),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                child: Text("😢 ${t('moodDifficult')}", style: const TextStyle(fontSize: 30)),
+                onPressed: () => _goToSliders("Difficult"),
+              ),
+              const SizedBox(height: 50),
+              ElevatedButton(
+                child: Text(t('moodHistory'), style: const TextStyle(fontSize: 26)),
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (context) => const MoodCheck4()),
+                  );
+                },
+              ),
+            ]),
           ),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            child: const Text("😐 Neutral", style: TextStyle(fontSize: 30)),
-            onPressed: () => _goToSliders("Neutral"),
-          ),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            child: const Text("🙁 Not Good", style: TextStyle(fontSize: 30)),
-            onPressed: () => _goToSliders("Not Good"),
-          ),
-          const SizedBox(height: 10),
-
-          ElevatedButton(
-            child: const Text("😢 Difficult", style: TextStyle(fontSize: 30)),
-            onPressed: () => _goToSliders("Difficult"),
-          ),
-
-          const SizedBox(height: 50),
-
-          ElevatedButton(
-            child: const Text("Mood Check history", style: TextStyle(fontSize: 26)),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => const MoodCheck4()),
-              );
-            },
-          ),
-        ]),
-      ),
+        );
+      },
     );
   }
 }

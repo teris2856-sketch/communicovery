@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:swiftspeak/app_keyboard.dart';
 import 'package:swiftspeak/login.dart';
+import 'package:swiftspeak/typing_prediction.dart';
 
 const _kPlaceholderPatientNames = [
   'Maya Thompson',
@@ -517,6 +519,7 @@ class StaffHomePage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 onPressed: () async {
+                  await TypingPredictionStore.instance.reset();
                   await FirebaseAuth.instance.signOut();
                   if (!context.mounted) return;
                   Navigator.of(context).pushAndRemoveUntil(
@@ -1070,9 +1073,10 @@ class _PatientDashboardState
               },
             ),
             buildBlueBox("Edit Recommendation", [
-              TextField(
+              AppKeyboardField(
                 controller: controller,
                 maxLines: null,
+                enableTidyUp: true,
                 decoration: const InputDecoration(
                   border: OutlineInputBorder(),
                 ),

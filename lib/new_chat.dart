@@ -1,9 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_tts/flutter_tts.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/home_page.dart';
 import 'package:swiftspeak/ai_chat_service.dart';
 import 'package:swiftspeak/chat_repository.dart';
+import 'package:swiftspeak/typing_prediction.dart';
 
 class NewChat extends StatefulWidget {
   const NewChat({super.key, this.chatId});
@@ -29,7 +32,7 @@ class _NewChatState extends State<NewChat> {
   void initState() {
     super.initState();
 
-    _flutterTts.setLanguage("en-US");
+    _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
     _flutterTts.setSpeechRate(0.5);
     _flutterTts.setPitch(1.0);
 
@@ -53,7 +56,7 @@ class _NewChatState extends State<NewChat> {
         setState(() => _chatId = id);
       }
     } catch (e) {
-      _showSnack("Failed to open chat: $e");
+      _showSnack(AppLanguage.instance.t('failedToOpenChat', {'error': '$e'}));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -77,7 +80,7 @@ class _NewChatState extends State<NewChat> {
         MaterialPageRoute(builder: (_) => NewChat(chatId: id)),
       );
     } catch (e) {
-      _showSnack("Failed to create chat: $e");
+      _showSnack(AppLanguage.instance.t('failedToCreateChat', {'error': '$e'}));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -89,6 +92,10 @@ class _NewChatState extends State<NewChat> {
 
     final text = _controller.text.trim();
     if (text.isEmpty) return;
+    TypingPredictionStore.instance.learnFromCommitted(
+      text,
+      surface: 'chatbot',
+    );
 
     setState(() => _isLoading = true);
     _controller.clear();
@@ -103,6 +110,7 @@ class _NewChatState extends State<NewChat> {
       // ✅ AI reply (persona is enforced inside AiChatService)
       final reply = await _ai.generateAssistantReply(chatMessages: recent);
       await _repo.addMessage(chatId: chatId, text: reply, isUser: false);
+      TypingPredictionStore.instance.setConversationHint(reply);
 
       // ---- Title rule: date + summary, generated after first user message ----
       final meta = await _repo.getChatMeta(chatId);
@@ -114,7 +122,9 @@ class _NewChatState extends State<NewChat> {
         final summary = await _ai.generateChatTitle(chatMessages: after);
 
         final finalTitle =
-        summary.isEmpty ? '$dateStr — New chat' : '$dateStr — $summary';
+        summary.isEmpty
+            ? '$dateStr — ${AppLanguage.instance.t('newChatTitle')}'
+            : '$dateStr — $summary';
 
         await _repo.setTitle(
           chatId: chatId,
@@ -123,7 +133,7 @@ class _NewChatState extends State<NewChat> {
         );
       }
     } catch (e) {
-      _showSnack("Send failed: $e");
+      _showSnack(AppLanguage.instance.t('sendFailed', {'error': '$e'}));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -142,11 +152,11 @@ class _NewChatState extends State<NewChat> {
 
       await _repo.addMessage(
         chatId: chatId,
-        text: "AI Recommendation:\n$rec",
+        text: "${AppLanguage.instance.t('aiRecPrefix')}\n$rec",
         isUser: false,
       );
     } catch (e) {
-      _showSnack("Recommendation failed: $e");
+      _showSnack(AppLanguage.instance.t('recFailed', {'error': '$e'}));
     } finally {
       setState(() => _isLoading = false);
     }
@@ -169,13 +179,14 @@ class _NewChatState extends State<NewChat> {
         if (!isUser) {
           final text = (data['text'] ?? '').toString();
           if (text.trim().isEmpty) continue;
+          await _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
           await _flutterTts.stop();
           await _flutterTts.speak(text);
           break;
         }
       }
     } catch (e) {
-      _showSnack("TTS failed: $e");
+      _showSnack(AppLanguage.instance.t('ttsFailed', {'error': '$e'}));
     }
   }
 
@@ -227,10 +238,12 @@ class _NewChatState extends State<NewChat> {
 
   @override
   Widget build(BuildContext context) {
+    return AppLangBuilder(
+      builder: (context, t) {
     final chatId = _chatId;
 
     return Scaffold(
-      backgroundColor: Colors.blueAccent.withValues(alpha: 0.08),
+      backgroundColor: const Color(0xFFF3F7FC),
 
       drawer: Drawer(
         child: Column(
@@ -241,9 +254,9 @@ class _NewChatState extends State<NewChat> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  const Text(
-                    "AI Chatbot",
-                    style: TextStyle(
+                  Text(
+                    t('aiChatbot'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 26,
                       fontWeight: FontWeight.bold,
@@ -252,7 +265,7 @@ class _NewChatState extends State<NewChat> {
                   const SizedBox(height: 12),
                   ElevatedButton.icon(
                     icon: const Icon(Icons.add),
-                    label: const Text("New Chat"),
+                    label: Text(t('newChat')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
                       foregroundColor: Colors.white,
@@ -277,7 +290,7 @@ class _NewChatState extends State<NewChat> {
 
                   final docs = snapshot.data!.docs;
                   if (docs.isEmpty) {
-                    return const Center(child: Text("No chats yet."));
+                    return Center(child: Text(t('noChatsYet')));
                   }
 
                   return ListView.builder(
@@ -308,7 +321,7 @@ class _NewChatState extends State<NewChat> {
 
             ListTile(
               leading: const Icon(Icons.home),
-              title: const Text("Back to Home"),
+              title: Text(t('backToHome')),
               onTap: () {
                 Navigator.pop(context);
                 Navigator.push(
@@ -323,7 +336,7 @@ class _NewChatState extends State<NewChat> {
       ),
 
       appBar: AppBar(
-        title: const Text('AI Chatbot'),
+        title: Text(t('aiChatbot')),
         backgroundColor: Colors.blueAccent,
       ),
 
@@ -334,9 +347,9 @@ class _NewChatState extends State<NewChat> {
               padding: const EdgeInsets.all(12),
               child: ElevatedButton.icon(
                 icon: const Icon(Icons.psychology, color: Colors.white),
-                label: const Text(
-                  "AI Recommendation",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+                label: Text(
+                  t('aiRecommendation'),
+                  style: const TextStyle(color: Colors.white, fontSize: 18),
                 ),
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
                 onPressed: (_isLoading || chatId == null) ? null : _generateAiRecommendation,
@@ -351,7 +364,7 @@ class _NewChatState extends State<NewChat> {
 
             Expanded(
               child: chatId == null
-                  ? const Center(child: Text("Opening your latest chat..."))
+                  ? Center(child: Text(t('openingLatestChat')))
                   : StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: _repo.messagesStream(chatId),
                 builder: (context, snapshot) {
@@ -383,12 +396,15 @@ class _NewChatState extends State<NewChat> {
               child: Row(
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: AppKeyboardField(
                       controller: _controller,
+                      enableTidyUp: true,
+                      enablePredictions: true,
+                      predictionSurface: 'chatbot',
                       decoration: InputDecoration(
                         filled: true,
                         fillColor: Colors.white,
-                        hintText: "Type your message...",
+                        hintText: t('typeMessage'),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
@@ -409,12 +425,14 @@ class _NewChatState extends State<NewChat> {
               child: ElevatedButton(
                 onPressed: chatId == null ? null : _speakLastAppMessage,
                 style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent),
-                child: const Text("Text-to-Speech", style: TextStyle(fontSize: 18)),
+                child: Text(t('textToSpeech'), style: const TextStyle(fontSize: 18)),
               ),
             ),
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

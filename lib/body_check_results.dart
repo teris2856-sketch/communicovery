@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/home_page.dart';
 import 'package:swiftspeak/body_check_service.dart';
 
@@ -49,7 +50,7 @@ class _BodyCheckResultsState extends State<BodyCheckResults> {
       final data = snap.data(); // ✅ THIS is the map
       if (data == null) {
         setState(() {
-          _error = "No data found for this record.";
+          _error = AppLanguage.instance.t('noDataFound');
           _loading = false;
         });
         return;
@@ -95,65 +96,59 @@ class _BodyCheckResultsState extends State<BodyCheckResults> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
-        title: const Text("Body Check Results"),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 8),
-
-              const Text(
-                "Pain Summary",
-                style: TextStyle(fontSize: 32),
-                textAlign: TextAlign.center,
-              ),
-
-              const SizedBox(height: 20),
-
-              if (_loading)
-                buildInfoContainer("Loading..."),
-
-              if (!_loading && _error != null)
-                buildInfoContainer("Error: $_error"),
-
-              if (!_loading && _error == null && painData.isEmpty)
-                buildInfoContainer("No pain reported today. Great job!"),
-
-              if (!_loading && _error == null && painData.isNotEmpty)
-                ...painData.entries.map(
+    return AppLangBuilder(
+      builder: (context, t) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.blueAccent,
+            title: Text(t('bodyCheckResults')),
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 8),
+                  Text(
+                    t('painSummary'),
+                    style: const TextStyle(fontSize: 32),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 20),
+                  if (_loading) buildInfoContainer(t('loading')),
+                  if (!_loading && _error != null)
+                    buildInfoContainer(_error!),
+                  if (!_loading && _error == null && painData.isEmpty)
+                    buildInfoContainer(t('noPainToday')),
+                  if (!_loading && _error == null && painData.isNotEmpty)
+                    ...painData.entries.map(
                       (entry) => buildPainContainer(entry.key, entry.value),
                     ),
-
-              const SizedBox(height: 20),
-
-              ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => const HomePage()),
+                  const SizedBox(height: 20),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (context) => const HomePage()),
                         (route) => false,
-                  );
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  child: Text(
-                    "Back to home",
-                    style: TextStyle(fontSize: 22),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      child: Text(
+                        t('backToHome'),
+                        style: const TextStyle(fontSize: 22),
+                      ),
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
-
-              const SizedBox(height: 20),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -186,13 +181,16 @@ class _BodyCheckResultsState extends State<BodyCheckResults> {
         child: Column(
           children: [
             Text(
-              bodyPart,
+              AppLanguage.instance.bodyPartLabel(bodyPart),
               style: const TextStyle(fontSize: 24),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 6),
             Text(
-              "Pain Level: $painLevel",
+              AppLanguage.instance.t(
+                'painLevelColon',
+                {'level': AppLanguage.instance.painLabel(painLevel)},
+              ),
               style: TextStyle(
                 fontSize: 22,
                 color: painColor,

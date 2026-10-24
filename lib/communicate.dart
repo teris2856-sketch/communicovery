@@ -17,6 +17,10 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'package:swiftspeak/aac_access_settings.dart';
+import 'package:swiftspeak/ai_chat_service.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
+import 'package:swiftspeak/typing_prediction.dart';
 
 part 'aac_core_fringe.dart';
 part 'aac_custom_words.dart';
@@ -208,11 +212,15 @@ class AacItem {
 
   /// Most buttons speak the word on the tile so people can build sentences.
   /// Emergency keeps a full help phrase.
+  String get displayLabel => AppLanguage.instance.aacLabel(label);
+
   String get spokenText {
     if (identity == 'Emergency' || originalLabel == 'Emergency') {
-      return speak ?? 'I need emergency help right now';
+      return AppLanguage.instance.aacLabel(
+        speak ?? 'I need emergency help right now',
+      );
     }
-    return label;
+    return displayLabel;
   }
 
   TtsTone get effectiveTone =>
@@ -747,15 +755,20 @@ class AacVocabulary {
     final ranked = <(int score, AacSearchHit hit)>[];
     for (final hit in searchIndex) {
       final label = hit.item.label.toLowerCase();
+      final translated = hit.item.displayLabel.toLowerCase();
       final original = (hit.item.originalLabel ?? '').toLowerCase();
       final speak = (hit.item.speak ?? '').toLowerCase();
       final location = hit.location.toLowerCase();
       int? score;
-      if (label == needle || original == needle) {
+      if (label == needle || original == needle || translated == needle) {
         score = 0;
-      } else if (label.startsWith(needle) || original.startsWith(needle)) {
+      } else if (label.startsWith(needle) ||
+          original.startsWith(needle) ||
+          translated.startsWith(needle)) {
         score = 1;
-      } else if (label.contains(needle) || original.contains(needle)) {
+      } else if (label.contains(needle) ||
+          original.contains(needle) ||
+          translated.contains(needle)) {
         score = 2;
       } else if (speak.startsWith(needle)) {
         score = 3;
@@ -1577,6 +1590,10 @@ class AacMessageController extends ChangeNotifier {
       text: next,
       selection: TextSelection.collapsed(offset: next.length),
     );
+    TypingPredictionStore.instance.learnFromTyping(
+      '$next ',
+      surface: 'communication',
+    );
     notifyListeners();
   }
 
@@ -1798,8 +1815,12 @@ class _AacBoardPageState extends State<AacBoardPage> {
   DateTime? _armedSince;
   Timer? _holdTimer;
   Timer? _highlightTimer;
+  Timer? _predictTimer;
   double _holdProgress = 0;
   String? _highlightLabel;
+  Set<String> _predictedIds = {};
+  List<String> _phraseSuggestions = [];
+  int _predictToken = 0;
 
   @override
   void initState() {
@@ -1809,10 +1830,18 @@ class _AacBoardPageState extends State<AacBoardPage> {
     _pageController = PageController(initialPage: _pageIndex);
     _setupTts();
     _startHighlightTimer();
+    AacMessageController.instance.addListener(_onPredictSourceChanged);
+    AacAccessController.instance.addListener(_onPredictSourceChanged);
+    AacCustomWordsController.instance.addListener(_onPredictSourceChanged);
+    AacButtonEditController.instance.addListener(_onPredictSourceChanged);
+    unawaited(TypingPredictionStore.instance.start());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _runPredict();
+    });
   }
 
   Future<void> _setupTts() async {
-    await _flutterTts.setLanguage('en-US');
+    await _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
     await _flutterTts.awaitSpeakCompletion(true);
     try {
       await _flutterTts.setIosAudioCategory(
@@ -1832,6 +1861,11 @@ class _AacBoardPageState extends State<AacBoardPage> {
   void dispose() {
     _holdTimer?.cancel();
     _highlightTimer?.cancel();
+    _predictTimer?.cancel();
+    AacMessageController.instance.removeListener(_onPredictSourceChanged);
+    AacAccessController.instance.removeListener(_onPredictSourceChanged);
+    AacCustomWordsController.instance.removeListener(_onPredictSourceChanged);
+    AacButtonEditController.instance.removeListener(_onPredictSourceChanged);
     _pageController.dispose();
     _flutterTts.stop();
     stopStoredButtonSound(_audioPlayer);
@@ -1868,6 +1902,213 @@ class _AacBoardPageState extends State<AacBoardPage> {
       _highlightLabel = label;
     });
     _startHighlightTimer();
+  }
+
+  void _onPredictSourceChanged() => _schedulePredict();
+
+  void _schedulePredict() {
+    _predictTimer?.cancel();
+    _predictTimer = Timer(const Duration(milliseconds: 250), _runPredict);
+  }
+
+  List<AacItem> get _visiblePredictItems {
+    final settings = AacAccessController.instance.settings;
+    final perPage = settings.buttonsPerPage;
+    final start = (_pageIndex * perPage).clamp(0, 1 << 20);
+    final slice = _contentItems.skip(start).take(perPage);
+    return [
+      ...slice,
+      if (widget.isHome) AacVocabulary.emergency,
+      AacVocabulary.yes,
+      AacVocabulary.no,
+    ].where((item) => !item.isAddWord).toList();
+  }
+
+  bool _isPredicted(AacItem item) => _predictedIds.contains(item.identity);
+
+  bool _isDimmed(AacItem item) {
+    if (_predictedIds.isEmpty ||
+        AacButtonEditController.instance.editing ||
+        _highlightLabel != null ||
+        _armedItem?.identity == item.identity) {
+      return false;
+    }
+    return !_isPredicted(item);
+  }
+
+  Set<String> _matchPredictedLabels(
+    Iterable<String> labels,
+    List<AacItem> items,
+  ) {
+    final byKey = <String, AacItem>{};
+    for (final item in items) {
+      byKey[item.label.toLowerCase().trim()] = item;
+      byKey[item.identity.toLowerCase().trim()] = item;
+    }
+    final matched = <String>{};
+    for (final label in labels) {
+      final item = byKey[label.toLowerCase().trim()];
+      if (item == null) continue;
+      matched.add(item.identity);
+      if (matched.length >= 2) break;
+    }
+    return matched;
+  }
+
+  Set<String> _heuristicPredict(String message, List<AacItem> items) {
+    final text = message.trim().toLowerCase();
+    final last = text.isEmpty
+        ? ''
+        : text
+            .split(RegExp(r'\s+'))
+            .last
+            .replaceAll(RegExp(r"[^a-z']"), '')
+            .replaceAll("'m", '')
+            .replaceAll("'re", '')
+            .replaceAll("'s", '');
+    const nextByLast = <String, List<String>>{
+      '': [
+        'I',
+        'want',
+        'need',
+        'help',
+        'Emergency',
+        'Pain',
+        'Hungry',
+        'Requests',
+        'Sentence starters',
+        'Core',
+        'Yes',
+      ],
+      'i': [
+        'want',
+        'need',
+        'feel',
+        'am',
+        'like',
+        'hurt',
+        'Needs',
+        'Feelings',
+        'Pain',
+      ],
+      'want': [
+        'water',
+        'help',
+        'food',
+        'Bathroom',
+        'more',
+        'Needs',
+        'Hungry',
+        'Thirsty',
+      ],
+      'need': [
+        'help',
+        'Bathroom',
+        'water',
+        'Medicine',
+        'rest',
+        'Needs',
+        'Care',
+      ],
+      'feel': ['Pain', 'sick', 'tired', 'good', 'bad', 'hot', 'cold', 'Feelings'],
+      'am': ['tired', 'hot', 'cold', 'in pain', 'ok', 'Feelings'],
+      'help': ['me', 'please', 'Bathroom', 'Pain', 'Emergency'],
+      'more': ['water', 'help', 'Pain', 'food', 'please'],
+      'pain': ['head', 'stomach', 'back', 'more', 'Pain'],
+      'my': ['head', 'stomach', 'back', 'throat', 'Pain'],
+      'go': ['Bathroom', 'home', 'outside'],
+      'eat': ['more', 'food', 'Hungry'],
+      'drink': ['water', 'Thirsty', 'more'],
+    };
+    var wanted = nextByLast[last];
+    if (wanted == null && text.endsWith('?')) {
+      wanted = ['Yes', 'No'];
+    }
+    wanted ??= ['Yes', 'No', 'more', 'help'];
+    return _matchPredictedLabels(wanted, items);
+  }
+
+  Future<void> _runPredict() async {
+    if (!mounted) return;
+    if (AacButtonEditController.instance.editing) {
+      if (_predictedIds.isNotEmpty || _phraseSuggestions.isNotEmpty) {
+        setState(() {
+          _predictedIds = {};
+          _phraseSuggestions = [];
+        });
+      }
+      return;
+    }
+
+    final items = _visiblePredictItems;
+    if (items.isEmpty) return;
+    final message = AacMessageController.instance.textController.text;
+    final local = _heuristicPredict(message, items);
+    final localPhrases = TypingPredictionStore.instance.localSuggestions(
+      message,
+      surface: 'communication',
+    );
+    if ((local.isNotEmpty && !_sameIds(local, _predictedIds)) ||
+        !_sameSuggestions(localPhrases, _phraseSuggestions)) {
+      setState(() {
+        if (local.isNotEmpty) _predictedIds = local;
+        _phraseSuggestions = localPhrases;
+      });
+    }
+
+    final token = ++_predictToken;
+    try {
+      final results = await Future.wait([
+        AiChatService().predictNextAacButtons(
+          currentMessage: message,
+          buttonLabels: items.map((item) => item.label).toList(),
+          personProfile: TypingPredictionStore.instance.surveyPrompt,
+        ),
+        AiChatService().predictTypingSuggestions(
+          currentText: message,
+          surface: 'communication',
+          learnedHints: TypingPredictionStore.instance.learnedHints(),
+          personProfile: TypingPredictionStore.instance.surveyPrompt,
+        ),
+      ]);
+      if (!mounted || token != _predictToken) return;
+      final matched = _matchPredictedLabels(results[0], items);
+      final phrases = <String>[];
+      for (final phrase in [...results[1], ...localPhrases]) {
+        if (phrases.any((item) => item.toLowerCase() == phrase.toLowerCase())) {
+          continue;
+        }
+        phrases.add(phrase);
+        if (phrases.length >= 6) break;
+      }
+      setState(() {
+        if (matched.isNotEmpty) _predictedIds = matched;
+        if (phrases.isNotEmpty) _phraseSuggestions = phrases;
+      });
+    } catch (_) {
+      // Keep the local guess if the AI call fails.
+    }
+  }
+
+  bool _sameSuggestions(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  void _acceptPhrase(String phrase) {
+    TypingPredictionStore.instance.learnAccepted(
+      AacMessageController.instance.textController.text.trim(),
+      phrase,
+    );
+    AacMessageController.instance.append(phrase);
+  }
+
+  bool _sameIds(Set<String> a, Set<String> b) {
+    if (a.length != b.length) return false;
+    return a.containsAll(b);
   }
 
   GlobalKey _tileKey(AacItem item) {
@@ -2041,17 +2282,6 @@ class _AacBoardPageState extends State<AacBoardPage> {
     AacMessageController.instance.append(item.spokenText);
   }
 
-  void _openKeyboard() {
-    Navigator.push(
-      context,
-      MaterialPageRoute<void>(
-        builder: (context) => AacKeyboardPage(
-          onOpenAccessSettings: () => showAacAccessSettings(context),
-        ),
-      ),
-    );
-  }
-
   Future<void> _openEditButton(AacItem item) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -2190,15 +2420,19 @@ class _AacBoardPageState extends State<AacBoardPage> {
         AacAccessController.instance,
         AacCustomWordsController.instance,
         AacButtonEditController.instance,
+        AppLanguage.instance,
       ]),
       builder: (context, _) {
         final settings = AacAccessController.instance.settings;
         return Scaffold(
           backgroundColor: const Color(0xFFF2F4F7),
+          resizeToAvoidBottomInset: false,
           appBar: AppBar(
             toolbarHeight: settings.toolbarHeight,
             title: Text(
-              widget.title,
+              widget.isHome || widget.title == 'Communicate'
+                  ? AppLanguage.instance.t('communicate')
+                  : AppLanguage.instance.aacLabel(widget.title),
               style: TextStyle(
                 fontSize: settings.toolbarTitleSize,
                 fontWeight: FontWeight.w600,
@@ -2212,12 +2446,6 @@ class _AacBoardPageState extends State<AacBoardPage> {
               color: Colors.white,
             ),
             actions: [
-              IconButton(
-                tooltip: 'Keyboard',
-                iconSize: settings.toolbarIconSize,
-                icon: const Icon(Icons.keyboard),
-                onPressed: _openKeyboard,
-              ),
               IconButton(
                 tooltip: 'Add a word',
                 iconSize: settings.toolbarIconSize,
@@ -2290,6 +2518,10 @@ class _AacBoardPageState extends State<AacBoardPage> {
   Future<void> _shareMessage(BuildContext context) async {
     final text = AacMessageController.instance.textController.text.trim();
     if (text.isEmpty) return;
+    TypingPredictionStore.instance.learnFromCommitted(
+      text,
+      surface: 'communication',
+    );
 
     final box = context.findRenderObject() as RenderBox?;
     try {
@@ -2353,9 +2585,15 @@ class _AacBoardPageState extends State<AacBoardPage> {
     final micSize = settings.toolbarHeight.clamp(48.0, 72.0);
 
     return ListenableBuilder(
-      listenable: AacMessageController.instance,
+      listenable: Listenable.merge([
+        AacMessageController.instance,
+        AppKeyboardController.instance,
+      ]),
       builder: (context, _) {
         final message = AacMessageController.instance;
+        final showPhraseRow = _phraseSuggestions.isNotEmpty &&
+            !AacButtonEditController.instance.editing &&
+            !AppKeyboardController.instance.showPredictBar;
         return Padding(
           padding: EdgeInsets.fromLTRB(
             settings.padding,
@@ -2370,14 +2608,16 @@ class _AacBoardPageState extends State<AacBoardPage> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: TextField(
+                    child: AppKeyboardField(
                       controller: message.textController,
+                      enableTidyUp: true,
+                      enablePredictions: true,
+                      predictionSurface: 'communication',
                       minLines: 1,
                       maxLines: 2,
-                      textInputAction: TextInputAction.done,
                       style: TextStyle(fontSize: settings.tileFontSize + 2),
                       decoration: InputDecoration(
-                        hintText: 'Type or speak a message',
+                        hintText: AppLanguage.instance.t('selectOrSpeak'),
                         filled: true,
                         fillColor: Colors.white,
                         contentPadding: const EdgeInsets.symmetric(
@@ -2434,6 +2674,54 @@ class _AacBoardPageState extends State<AacBoardPage> {
                   ),
                 ],
               ),
+              const SizedBox(height: 6),
+              Text(
+                TypingPredictionStore.instance.hasSurvey
+                    ? AppLanguage.instance.t('suggestionsUseSurvey')
+                    : AppLanguage.instance.t('suggestionsGeneral'),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.blueGrey.shade600,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              if (showPhraseRow) ...[
+                const SizedBox(height: 8),
+                SizedBox(
+                  height: 40,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _phraseSuggestions.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 6),
+                    itemBuilder: (context, index) {
+                      final phrase = _phraseSuggestions[index];
+                      return Material(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        child: InkWell(
+                          onTap: () => _acceptPhrase(phrase),
+                          borderRadius: BorderRadius.circular(18),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12),
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(color: Colors.blueAccent),
+                            ),
+                            child: Text(
+                              phrase,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: Colors.blueAccent,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ],
               if (message.isListening) ...[
                 const SizedBox(height: 6),
                 const Text(
@@ -2489,7 +2777,10 @@ class _AacBoardPageState extends State<AacBoardPage> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: pageCount,
-              onPageChanged: (index) => setState(() => _pageIndex = index),
+              onPageChanged: (index) {
+                setState(() => _pageIndex = index);
+                _schedulePredict();
+              },
               itemBuilder: (context, page) {
                 final slice =
                     content.skip(page * perPage).take(perPage).toList();
@@ -2525,6 +2816,7 @@ class _AacBoardPageState extends State<AacBoardPage> {
 
         return GridView.builder(
           physics: const NeverScrollableScrollPhysics(),
+          clipBehavior: Clip.none,
           itemCount: slice.length,
           gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: columns,
@@ -2548,6 +2840,8 @@ class _AacBoardPageState extends State<AacBoardPage> {
                       slice[index].label.toLowerCase() ||
                   _highlightLabel?.toLowerCase() ==
                       slice[index].identity.toLowerCase(),
+              isPredicted: _isPredicted(slice[index]),
+              isDimmed: _isDimmed(slice[index]),
               holdProgress: _armedItem?.identity == slice[index].identity
                   ? _holdProgress
                   : 0,
@@ -2629,6 +2923,8 @@ class _AacBoardPageState extends State<AacBoardPage> {
                         pinned[i].label.toLowerCase() ||
                     _highlightLabel?.toLowerCase() ==
                         pinned[i].identity.toLowerCase(),
+                isPredicted: _isPredicted(pinned[i]),
+                isDimmed: _isDimmed(pinned[i]),
                 holdProgress: _armedItem?.identity == pinned[i].identity
                     ? _holdProgress
                     : 0,
@@ -2902,7 +3198,7 @@ class _AacKeyboardPageState extends State<AacKeyboardPage> {
   }
 
   Future<void> _setupTts() async {
-    await _flutterTts.setLanguage('en-US');
+    await _flutterTts.setLanguage(AppLanguage.instance.ttsLanguage);
     await _flutterTts.setSpeechRate(0.45);
     await _flutterTts.setVolume(0.95);
     try {
@@ -4149,7 +4445,7 @@ class _AacSearchSheetState extends State<_AacSearchSheet> {
                               child: Icon(hit.item.icon, color: hit.item.color),
                             ),
                             title: Text(
-                              hit.item.label,
+                              hit.item.displayLabel,
                               style: const TextStyle(
                                 fontWeight: FontWeight.w700,
                               ),
@@ -4203,6 +4499,8 @@ class _AacTile extends StatelessWidget {
     this.fontSize = 14,
     this.isArmed = false,
     this.isHighlighted = false,
+    this.isPredicted = false,
+    this.isDimmed = false,
     this.isEditing = false,
     this.holdProgress = 0,
   });
@@ -4212,6 +4510,8 @@ class _AacTile extends StatelessWidget {
   final double fontSize;
   final bool isArmed;
   final bool isHighlighted;
+  final bool isPredicted;
+  final bool isDimmed;
   final bool isEditing;
   final double holdProgress;
 
@@ -4220,33 +4520,59 @@ class _AacTile extends StatelessWidget {
     final foreground = item.foregroundColor ?? Colors.black87;
     final background = item.tileColor ??
         (item.isFolder ? const Color(0xFFE3F2FD) : Colors.white);
+    final standOut = isPredicted || isHighlighted;
     final highlight = Color.alphaBlend(
-      Colors.blueAccent.withValues(alpha: 0.18),
+      (isPredicted ? Colors.amber : Colors.blueAccent)
+          .withValues(alpha: isPredicted ? 0.28 : 0.18),
       background,
     );
 
-    return AnimatedContainer(
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 220),
+      opacity: isDimmed ? 0.32 : 1,
+      child: AnimatedScale(
+        duration: const Duration(milliseconds: 220),
+        scale: isPredicted ? 1.08 : 1,
+        child: AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isHighlighted ? Colors.amber : Colors.transparent,
-          width: isHighlighted ? 3 : 0,
+          color: isPredicted
+              ? const Color(0xFFFFB300)
+              : isHighlighted
+                  ? Colors.amber
+                  : Colors.transparent,
+          width: isPredicted
+              ? 4
+              : isHighlighted
+                  ? 3
+                  : 0,
         ),
-        boxShadow: isHighlighted
+        boxShadow: standOut
             ? [
                 BoxShadow(
-                  color: Colors.amber.withValues(alpha: 0.45),
-                  blurRadius: 10,
-                  spreadRadius: 1,
+                  color: (isPredicted ? const Color(0xFFFFB300) : Colors.amber)
+                      .withValues(alpha: isPredicted ? 0.7 : 0.45),
+                  blurRadius: isPredicted ? 16 : 10,
+                  spreadRadius: isPredicted ? 2 : 1,
                 ),
               ]
             : null,
       ),
-      child: Material(
-        color: isArmed || isHighlighted ? highlight : background,
+      child: ColorFiltered(
+        colorFilter: isDimmed
+            ? const ColorFilter.matrix(<double>[
+                0.35, 0.45, 0.1, 0, 20,
+                0.35, 0.45, 0.1, 0, 20,
+                0.35, 0.45, 0.1, 0, 20,
+                0, 0, 0, 1, 0,
+              ])
+            : const ColorFilter.mode(Colors.transparent, BlendMode.dst),
+        child: Material(
+        color: isArmed || standOut ? highlight : background,
         borderRadius: BorderRadius.circular(16),
-        elevation: isArmed || isHighlighted ? 6 : 4,
+        elevation: isArmed || standOut ? 8 : 4,
         child: Padding(
         padding: const EdgeInsets.all(8),
         child: Stack(
@@ -4271,7 +4597,7 @@ class _AacTile extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     child: Text(
-                      item.label,
+                      item.displayLabel,
                       textAlign: TextAlign.center,
                       maxLines: 2,
                       style: TextStyle(
@@ -4284,6 +4610,16 @@ class _AacTile extends StatelessWidget {
                 ],
               ),
             ),
+            if (isPredicted)
+              Positioned(
+                right: 0,
+                top: 0,
+                child: Icon(
+                  Icons.auto_awesome,
+                  size: fontSize + 2,
+                  color: const Color(0xFFFF8F00),
+                ),
+              ),
             if (isEditing)
               Positioned(
                 left: 0,
@@ -4294,7 +4630,7 @@ class _AacTile extends StatelessWidget {
                   color: Colors.orange,
                 ),
               ),
-            if (item.isFolder)
+            if (item.isFolder && !isPredicted)
               Positioned(
                 right: 0,
                 top: 0,
@@ -4322,6 +4658,9 @@ class _AacTile extends StatelessWidget {
           ],
         ),
       ),
+      ),
+      ),
+        ),
       ),
     );
   }

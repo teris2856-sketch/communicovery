@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:swiftspeak/app_keyboard.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/signup.dart';
+import 'package:swiftspeak/welcome_survey_page.dart';
 import 'home_page.dart';
 import 'staff_home_page.dart';
 
@@ -29,8 +32,20 @@ class _LoginState extends State<Login> {
       final uid = _auth.currentUser!.uid;
       final doc = await _firestore.collection('users').doc(uid).get();
       final role = doc.data()?['role'] as String?;
+      final needsSurvey = doc.data()?['surveyCompleted'] == false;
+      await AppLanguage.instance.applyFromUserDoc(doc.data());
 
       if (!mounted) return;
+
+      if (needsSurvey) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (_) => WelcomeSurveyPage(role: role ?? 'patient'),
+          ),
+        );
+        return;
+      }
 
       if (role == 'staff') {
         Navigator.pushReplacement(
@@ -61,25 +76,31 @@ class _LoginState extends State<Login> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return ListenableBuilder(
+      listenable: AppLanguage.instance,
+      builder: (context, _) {
+        final t = AppLanguage.instance.t;
+        return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.blueAccent,
-        title: const Text('Login'),
+        title: Text(t('login')),
       ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Text("Login", style: TextStyle(fontSize: 50)),
+            Text(t('login'), style: const TextStyle(fontSize: 50)),
 
             Padding(
               padding: const EdgeInsets.all(10),
-              child: TextField(
+              child: AppKeyboardField(
                 controller: emailController,
+                enableTidyUp: false,
+                hideTidyUp: true,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
-                  hintText: "Email",
+                  hintText: t('email'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -89,13 +110,15 @@ class _LoginState extends State<Login> {
 
             Padding(
               padding: const EdgeInsets.all(10),
-              child: TextField(
+              child: AppKeyboardField(
                 controller: passwordController,
+                enableTidyUp: false,
+                hideTidyUp: true,
                 obscureText: true,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: Colors.white,
-                  hintText: "Password",
+                  hintText: t('password'),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),
@@ -109,12 +132,12 @@ class _LoginState extends State<Login> {
                 foregroundColor: Colors.white,
               ),
               onPressed: loginUser,
-              child: const Text("Login", style: TextStyle(fontSize: 18)),
+              child: Text(t('login'), style: const TextStyle(fontSize: 18)),
             ),
 
             const SizedBox(height: 10),
 
-            const Text("Sign up if you don't have an account already:"),
+            Text(t('signUpIfNeeded')),
 
             ElevatedButton(
               style: ElevatedButton.styleFrom(
@@ -127,11 +150,13 @@ class _LoginState extends State<Login> {
                   MaterialPageRoute(builder: (_) => const Signup()),
                 );
               },
-              child: const Text("Sign Up", style: TextStyle(fontSize: 18)),
+              child: Text(t('signUp'), style: const TextStyle(fontSize: 18)),
             ),
           ],
         ),
       ),
+    );
+      },
     );
   }
 }

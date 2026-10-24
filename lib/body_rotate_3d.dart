@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/body_painter.dart';
 import 'package:swiftspeak/body_side_profile_painter.dart';
 
@@ -69,15 +70,16 @@ class BodyRotate3D extends StatelessWidget {
 
   /// Human-readable label for the view facing the camera.
   static String viewLabelForFace(BodyBoxFace face) {
+    final t = AppLanguage.instance.t;
     switch (face) {
       case BodyBoxFace.front:
-        return 'Front';
+        return t('viewFront');
       case BodyBoxFace.back:
-        return 'Back';
+        return t('viewBack');
       case BodyBoxFace.sideLeft:
-        return 'Left Side';
+        return t('viewLeft');
       case BodyBoxFace.sideRight:
-        return 'Right Side';
+        return t('viewRight');
     }
   }
 

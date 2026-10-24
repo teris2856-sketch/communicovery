@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:swiftspeak/app_language.dart';
 import 'package:swiftspeak/home_page.dart';
 import 'package:swiftspeak/mood_check_service.dart';
 
@@ -26,7 +27,7 @@ class _MoodCheck3State extends State<MoodCheck3> {
   final MoodCheckService _service = MoodCheckService();
 
   bool _loading = true;
-  String _insight = "Generating insight...";
+  String _insight = AppLanguage.instance.t('generatingInsight');
   String? _entryId;
 
   @override
@@ -71,63 +72,77 @@ class _MoodCheck3State extends State<MoodCheck3> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.blueAccent,
-        title: const Text('Mood Check Results'),
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Center(
-            child: Column(
-              children: [
-                const Text(
-                  "Here's your results:",
-                  style: TextStyle(fontSize: 40),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 20),
-
-                _buildResultBox("Your Mood Today:", widget.moodToday),
-                _buildResultBox("Your Stress Level:", widget.stress.toStringAsFixed(1)),
-                _buildResultBox("Your Energy Level:", widget.energy.toStringAsFixed(1)),
-                _buildResultBox("Your Hopefulness Level:", widget.hopefulness.toStringAsFixed(1)),
-                _buildResultBox("Your Confidence Level:", widget.confidence.toStringAsFixed(1)),
-
-                _buildResultBox(
-                  "AI Insight:",
-                  _insight,
-                  isInsight: true,
-                ),
-
-                if (_entryId != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      "Saved (id: $_entryId)",
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
+    return AppLangBuilder(
+      builder: (context, t) {
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Colors.blueAccent,
+            title: Text(t('moodResults')),
+          ),
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16.0),
+              child: Center(
+                child: Column(
+                  children: [
+                    Text(
+                      t('hereAreResults'),
+                      style: const TextStyle(fontSize: 40),
+                      textAlign: TextAlign.center,
                     ),
-                  ),
-
-                const SizedBox(height: 20),
-
-                ElevatedButton(
-                  child: const Text(
-                    "Back to home",
-                    style: TextStyle(fontSize: 26),
-                  ),
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (context) => const HomePage()),
-                    );
-                  },
+                    const SizedBox(height: 20),
+                    _buildResultBox(
+                      t('yourMoodToday'),
+                      AppLanguage.instance.moodLabel(widget.moodToday),
+                    ),
+                    _buildResultBox(
+                      t('yourStressLevel'),
+                      widget.stress.toStringAsFixed(1),
+                    ),
+                    _buildResultBox(
+                      t('yourEnergyLevel'),
+                      widget.energy.toStringAsFixed(1),
+                    ),
+                    _buildResultBox(
+                      t('yourHopefulnessLevel'),
+                      widget.hopefulness.toStringAsFixed(1),
+                    ),
+                    _buildResultBox(
+                      t('yourConfidenceLevel'),
+                      widget.confidence.toStringAsFixed(1),
+                    ),
+                    _buildResultBox(
+                      t('aiInsight'),
+                      _insight,
+                      isInsight: true,
+                    ),
+                    if (_entryId != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          t('savedId', {'id': _entryId!}),
+                          style: const TextStyle(fontSize: 14, color: Colors.grey),
+                        ),
+                      ),
+                    const SizedBox(height: 20),
+                    ElevatedButton(
+                      child: Text(
+                        t('backToHome'),
+                        style: const TextStyle(fontSize: 26),
+                      ),
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(builder: (context) => const HomePage()),
+                        );
+                      },
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -154,7 +169,7 @@ class _MoodCheck3State extends State<MoodCheck3> {
             ),
             const SizedBox(height: 6),
             if (_loading && isInsight)
-              const Text("Generating insight...", style: TextStyle(fontSize: 24))
+              Text(AppLanguage.instance.t('generatingInsight'), style: const TextStyle(fontSize: 24))
             else
               Text(
                 value,
